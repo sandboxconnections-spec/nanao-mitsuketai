@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ななおのみりょくを みつけ隊</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  body{margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:#FFF8F1; color:#3D2F1C; font-family:"Hiragino Sans","Noto Sans JP",sans-serif; text-align:center; padding:24px;}
+  .box{max-width:340px;}
+  h1{font-size:20px; color:#E5613A; margin:0 0 12px;}
+  p{font-size:15px; line-height:1.8; margin:0;}
+  .spin{margin:18px auto 0; width:28px; height:28px; border:3px solid #F0D8C8; border-top-color:#E5613A;
+    border-radius:50%; animation:r 1s linear infinite;}
+  @keyframes r{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>ななおのみりょくを みつけ隊</h1>
+  <p id="msg">よみこみ中…</p>
+  <div class="spin" id="spin"></div>
+</div>
+<script>
+  // ▼ 設定（LIFF作成後に差し替え）
+  const LIFF_ID = "XXXXXXXXXX-xxxxxxxx";          // LIFF ID
+  const API = "https://YOUR-CLOUD-RUN-URL";        // バックエンド（/join のホスト）
+
+  const AREA_NAME = { misogi:"御祓", sodegae:"袖ヶ江", yatago:"矢田郷", wakura:"和倉" };
+  const area = new URLSearchParams(location.search).get("area");
+
+  const msg = document.getElementById("msg");
+  const spin = document.getElementById("spin");
+  const done = (t) => { msg.textContent = t; spin.style.display = "none"; };
+
+  async function main() {
+    if (!AREA_NAME[area]) { done("地区が指定されていません。台紙のQRから開いてね。"); return; }
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; } // 友だち追加もここで促す
+
+    const idToken = liff.getIDToken();
+    const r = await fetch(API + "/join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken, area }),
+    });
+    if (!r.ok) { done("エラーが起きました。もう一度ためしてね。"); return; }
+    done(AREA_NAME[area] + "地区へようこそ！\nLINEのトークにスポットが届きます。");
+  }
+
+  main().catch((e) => { console.error(e); done("エラー：" + e.message); });
+</script>
+</body>
+</html>
