@@ -28,15 +28,16 @@
   const API = "https://mitsuketai-line-867643805805.asia-northeast1.run.app"; // バックエンド（/join のホスト）
 
   const AREA_NAME = { misogi:"御祓", sodegae:"袖ヶ江", yatago:"矢田郷", wakura:"和倉" };
-  const area = new URLSearchParams(location.search).get("area");
 
   const msg = document.getElementById("msg");
   const spin = document.getElementById("spin");
   const done = (t) => { msg.textContent = t; spin.style.display = "none"; };
 
   async function main() {
-    if (!AREA_NAME[area]) { done("地区が指定されていません。台紙のQRから開いてね。"); return; }
     await liff.init({ liffId: LIFF_ID });
+    // liff.init() 後でないと liff.state が復元されず area が取れない
+    const area = new URLSearchParams(location.search).get("area");
+    if (!AREA_NAME[area]) { done("地区が指定されていません。台紙のQRから開いてね。"); return; }
     if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; } // 友だち追加もここで促す
 
     const idToken = liff.getIDToken();
