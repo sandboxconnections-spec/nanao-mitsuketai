@@ -3,43 +3,177 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ななおのみりょくを みつけ隊</title>
+<title>ななおのなぞをおいかけ隊</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
-  body{margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
-    background:#FFF8F1; color:#3D2F1C; font-family:"Hiragino Sans","Noto Sans JP",sans-serif; text-align:center; padding:24px;}
-  .box{max-width:340px;}
-  h1{font-size:20px; color:#E5613A; margin:0 0 12px;}
-  p{font-size:15px; line-height:1.8; margin:0;}
-  .spin{margin:18px auto 0; width:28px; height:28px; border:3px solid #F0D8C8; border-top-color:#E5613A;
-    border-radius:50%; animation:r 1s linear infinite;}
+  *{box-sizing:border-box;}
+  :root{ --cream:#FFF8F1; --coral:#E5613A; --teal:#1F5A6B; --ink:#3D2F1C; --sub:#7a6a58; }
+  body{margin:0; min-height:100vh; background:var(--cream); color:var(--ink);
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:20px 16px;}
+  .wrap{width:100%; max-width:380px;}
+  .view{display:none;}
+  .view.on{display:block;}
+
+  /* 読み込み中 */
+  #loading{text-align:center;}
+  #loading p{font-size:15px; color:var(--sub); margin:0;}
+  .spin{margin:16px auto 0; width:28px; height:28px; border:3px solid #F0D8C8;
+    border-top-color:var(--coral); border-radius:50%; animation:r 1s linear infinite;}
   @keyframes r{to{transform:rotate(360deg)}}
+
+  /* 受付(area)モード ＝ 従来どおり */
+  #areaView{text-align:center;}
+  #areaView h1{font-size:20px; color:var(--coral); margin:0 0 12px;}
+  #areaView p{font-size:15px; line-height:1.8; margin:0; white-space:pre-line;}
+
+  /* ヒント(spot)モード */
+  .card{background:#fff; border:3px solid var(--coral); border-radius:22px;
+    padding:20px 20px 18px; box-shadow:0 6px 18px rgba(61,47,28,.08);}
+  .badge{display:inline-flex; align-items:center; gap:6px; background:var(--coral); color:#fff;
+    font-size:15px; font-weight:800; border-radius:999px; padding:6px 16px; margin-bottom:14px;}
+  .badge svg{width:17px; height:17px;}
+  .hint{font-size:21px; line-height:2.35; font-weight:700; margin:0;}
+  .hint ruby rt{font-size:.45em; font-weight:600; color:var(--sub);}
+  .cta{margin:16px 0 0; padding-top:14px; border-top:2px dashed #F0D8C8;
+    font-size:16px; font-weight:800; color:var(--teal); text-align:center;}
+  .foot{margin:15px 4px 0; font-size:12.5px; line-height:1.75; color:var(--sub); text-align:center;}
 </style>
 </head>
 <body>
-<div class="box">
-  <h1>ななおのみりょくを みつけ隊</h1>
-  <p id="msg">よみこみ中…</p>
-  <div class="spin" id="spin"></div>
+<div class="wrap">
+
+  <div class="view on" id="loading">
+    <p>よみこみ中…</p>
+    <div class="spin"></div>
+  </div>
+
+  <div class="view" id="areaView">
+    <h1>ななおのなぞをおいかけ隊</h1>
+    <p id="msg"></p>
+  </div>
+
+  <div class="view" id="hintView">
+    <div class="card">
+      <span class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>
+        </svg>ヒント
+      </span>
+      <p class="hint" id="hintText"></p>
+      <div class="cta" id="hintCta">この ばしょを さがしてみよう！</div>
+    </div>
+    <p class="foot" id="hintFoot">
+      まだ わからないときは、コミセンの 受付で 聞いてね。
+    </p>
+  </div>
+
 </div>
+
 <script>
-  // ▼ 設定（LIFF作成後に差し替え）
-  const LIFF_ID = "2010496473-AeMxFccp";                                  // LIFF ID
-  const API = "https://mitsuketai-line-867643805805.asia-northeast1.run.app"; // バックエンド（/join のホスト）
+  // ── 設定 ────────────────────────────────────────────────
+  const LIFF_ID = "2010496473-AeMxFccp";                                       // LIFF ID
+  const API = "https://mitsuketai-line-867643805805.asia-northeast1.run.app";  // バックエンド
+
+  // ── ヒント文（正本＝Cloude秘書/七尾ネットワーク会議/おいかけ隊_QRヒント文一覧）──
+  //    表記：漢字のうしろの (かな) は自動で ふりがな になる。答えのスポット名は言わない。
+  const HINTS = {
+    hanayome:
+      "お嫁(よめ)さんの 体験(たいけん)が できる 場所(ばしょ)だよ！",
+    komaruyama:
+      "前田利家(まえだとしいえ)が、ここから えらい お殿様(とのさま)に 出世(しゅっせ)した お城(しろ)の あとだよ。",
+    sentai:
+      "お祭(まつ)りの でか山(やま)が、ここで グルッと 向(む)きを 変(か)えるよ。御祓川(みそぎがわ)に かかる 橋(はし)だよ。",
+    satoyama:
+      "むかし 能登(のと)の 海(うみ)を およいでいた、カバみたいな 動物(どうぶつ)の 歯(は)の 化石(かせき)が あるよ。入(はい)るのは タダ！",
+    soyu:
+      "なめると 海(うみ)みたいに しょっぱい、あつ〜い お湯(ゆ)が わく 場所(ばしょ)。足湯(あしゆ)も あるよ。",
+    matsuri:
+      "日本一(にほんいち) 大(おお)きい お祭(まつ)りの でか山(やま)を、いつでも 近(ちか)くで 見(み)られる 建物(たてもの)だよ。",
+    shingyoji:
+      "1つの 建物(たてもの)を 2つに 分(わ)けて 運(はこ)んだ、その 片方(かたほう)が ある お寺(てら)。もう 片方(かたほう)は 青林寺(せいりんじ)に あるよ。",
+    sukunahikona:
+      "ちがう しゅるいの 木(き)が 2本(ほん)、くっついて 1本(ぽん)みたいに なった「夫婦(めおと)の 木(き)」が ある 神社(じんじゃ)だよ。",
+    sanno:
+      "お祭(まつ)りで、日本一(にほんいち) 大(おお)きい でか山(やま)が 3台(だい) 勢(せい)ぞろいする 神社(じんじゃ)だよ！",
+    shokusai:
+      "新鮮(しんせん)な 魚(さかな)や 海(うみ)の 幸(さち)が ならぶ、海(うみ)ぞいの 大(おお)きな 市場(いちば)だよ。",
+    wakaba:
+      "地元(じもと)で とれた 新鮮(しんせん)な 野菜(やさい)や お花(はな)、お米(こめ)が そろう お店(みせ)だよ。",
+    doshirube:
+      "ただの 古(ふる)い 石(いし)に 見(み)えるけど、むかしは ここが 道(みち)のりや 運(はこ)ぶ 値段(ねだん)を きめる「ゼロの ちてん」だったんだ。",
+    shiryokan:
+      "日本(にほん)の「五大山城(ごだいやまじろ)」の ひとつ、七尾城(ななおじょう)の ことが わかる 資料館(しりょうかん)だよ。",
+    kodomo:
+      "小(ちい)さな 子(こ)から 小学生(しょうがくせい)まで 遊(あそ)べる アクティビティが いっぱい！ 入(はい)るのは タダだよ。",
+    tenbodai:
+      "七尾(ななお)のまちと 海(うみ)を ぜんぶ 見(み)わたせる、七尾城(ななおじょう)が あった 山(やま)の 上(うえ)の 展望台(てんぼうだい)だよ。",
+    shiroyama:
+      "七尾城(ななおじょう)の いちばん 上(うえ)、本丸(ほんまる)が あった てっぺんに 立(た)つ 神社(じんじゃ)だよ。",
+  };
 
   const AREA_NAME = { misogi:"御祓", sodegae:"袖ヶ江", yatago:"矢田郷", wakura:"和倉" };
 
-  const msg = document.getElementById("msg");
-  const spin = document.getElementById("spin");
-  const done = (t) => { msg.textContent = t; spin.style.display = "none"; };
+  // ── 表示ヘルパ ──────────────────────────────────────────
+  const show = (id) => {
+    ["loading","areaView","hintView"].forEach((v) =>
+      document.getElementById(v).classList.toggle("on", v === id));
+  };
+  const done = (t) => { document.getElementById("msg").textContent = t; show("areaView"); };
 
-  async function main() {
-    await liff.init({ liffId: LIFF_ID });
-    // liff.init() 後でないと liff.state が復元されず area が取れない
-    const area = new URLSearchParams(location.search).get("area");
-    if (!AREA_NAME[area]) { done("地区が指定されていません。台紙のQRから開いてね。"); return; }
+  // 漢字のうしろの (かな) を <ruby> に変換（子どもが読めるように）
+  const toRuby = (s) =>
+    s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+     .replace(/([一-龥々]+)[(（]([ぁ-ゖー]+)[)）]/g,
+              (_, kanji, yomi) => `<ruby>${kanji}<rt>${yomi}</rt></ruby>`);
+
+  // liff.init() 後は location.search に戻るが、戻らない環境向けに liff.state も見る
+  function readParam(name) {
+    const sp = new URLSearchParams(location.search);
+    const v = sp.get(name);
+    if (v) return v;
+    const st = sp.get("liff.state");
+    if (st) {
+      try {
+        const q = decodeURIComponent(st);
+        const i = q.indexOf("?");
+        return new URLSearchParams(i >= 0 ? q.slice(i) : q).get(name);
+      } catch (e) { console.error(e); }
+    }
+    return null;
+  }
+
+  // ── ヒント（無料：画面に出すだけ。友だち追加は強制しない）──
+  function showHint(spot, liffOk) {
+    const text = HINTS[spot];
+    if (!text) {
+      document.getElementById("hintText").textContent =
+        "ヒントが みつかりませんでした。なぞの 紙の QRを もう一度 読んでね。";
+      document.getElementById("hintCta").style.display = "none";
+      show("hintView");
+      return;
+    }
+    document.getElementById("hintText").innerHTML = toRuby(text);
+    show("hintView");
+    countView(spot, liffOk); // 計測は裏で（失敗しても画面には影響させない）
+  }
+
+  // ── 開封計測（どのなぞで詰まったかを数える。失敗は無視）──
+  function countView(spot, liffOk) {
+    try {
+      const idToken = (liffOk && liff.isLoggedIn()) ? liff.getIDToken() : null;
+      fetch(API + "/hint-view", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, spot }),
+        keepalive: true,
+      }).catch((e) => console.error(e));
+    } catch (e) { console.error(e); }
+  }
+
+  // ── 受付（従来どおり：登録して第1のなぞを受け取る）──
+  async function joinArea(area) {
     if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; } // 友だち追加もここで促す
-
     const idToken = liff.getIDToken();
     const r = await fetch(API + "/join", {
       method: "POST",
@@ -48,6 +182,24 @@
     });
     if (!r.ok) { done("エラーが起きました。もう一度ためしてね。"); return; }
     done(AREA_NAME[area] + "地区へようこそ！\nLINEのトークにスポットが届きます。");
+  }
+
+  async function main() {
+    // liff.init() 後でないと liff.state が復元されず パラメータが取れない。
+    // ただし init が失敗しても「ヒントだけは必ず出す」（現地の救済機能なので止めない）。
+    let liffOk = false;
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      liffOk = true;
+    } catch (e) { console.error("liff.init failed", e); }
+
+    const spot = readParam("spot");
+    if (spot) { showHint(spot, liffOk); return; }   // ← ヒントQR
+
+    if (!liffOk) { done("エラーが起きました。もう一度ためしてね。"); return; }
+    const area = readParam("area");                 // ← 受付QR（従来）
+    if (!AREA_NAME[area]) { done("地区が指定されていません。台紙のQRから開いてね。"); return; }
+    await joinArea(area);
   }
 
   main().catch((e) => { console.error(e); done("エラー：" + e.message); });
