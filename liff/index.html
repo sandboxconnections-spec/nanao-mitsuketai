@@ -68,6 +68,19 @@
     </p>
   </div>
 
+  <div class="view" id="rareView">
+    <div class="card">
+      <span class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2l2.6 5.6 6.1.8-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6L3.3 8.4l6.1-.8z"/>
+        </svg>ちゅうせんけん
+      </span>
+      <p class="hint" id="rareText"></p>
+      <div class="cta" id="rareCta"></div>
+    </div>
+    <p class="foot" id="rareFoot"></p>
+  </div>
+
 </div>
 
 <script>
@@ -114,9 +127,19 @@
 
   const AREA_NAME = { misogi:"御祓", sodegae:"袖ヶ江", yatago:"矢田郷", wakura:"和倉" };
 
+  // ── 抽選QR（?rare=）で出す文 ────────────────────────────
+  //    キーワードは掲示に残しつつ、入力はさせない（打ち間違い・表記ゆれの事故をなくす）。
+  //    「何を見つけたか」を言い当てることで、現地に行った手ざわりを残す。
+  const RARE_FOUND = {
+    misogi:  "「デスモスチルス」の 歯(は)の 化石(かせき)を 見(み)つけたね！",
+    wakura:  "「夫婦(めおと)の 木(き)」を 見(み)つけたね！",
+    sodegae: "「ゼロの ちてん」を 見(み)つけたね！",
+    yatago:  "畠山(はたけやま)の お城(しろ)の てっぺんに ついたね！",
+  };
+
   // ── 表示ヘルパ ──────────────────────────────────────────
   const show = (id) => {
-    ["loading","areaView","hintView"].forEach((v) =>
+    ["loading","areaView","hintView","rareView"].forEach((v) =>
       document.getElementById(v).classList.toggle("on", v === id));
   };
   const done = (t) => { document.getElementById("msg").textContent = t; show("areaView"); };
@@ -171,6 +194,55 @@
     } catch (e) { console.error(e); }
   }
 
+  // ── 抽選券（レアスポット現地のQR。画面に出すだけ＝push無料）──
+  //    当選連絡のためユーザーを確定する必要があるので、ヒントと違いログインを求める。
+  async function claimRareTicket(area) {
+    if (!AREA_NAME[area]) { done("地区が指定されていません。掲示のQRから開いてね。"); return; }
+    if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+
+    const setRare = (text, cta, foot) => {
+      document.getElementById("rareText").innerHTML = toRuby(text);
+      document.getElementById("rareCta").innerHTML = toRuby(cta);
+      document.getElementById("rareFoot").innerHTML = toRuby(foot);
+      show("rareView");
+    };
+
+    let r;
+    try {
+      r = await fetch(API + "/rare-ticket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: liff.getIDToken(), area }),
+      });
+    } catch (e) {
+      console.error(e);
+      // 山の上は電波が弱い（城山神社・城山展望台）。押し直せば取れるので、そう言う。
+      setRare("うまく つながりませんでした。",
+              "すこし あるいてから もう一度 よみこんでね。",
+              "それでも ダメなときは、コミセンの 受付で 聞いてね。");
+      return;
+    }
+    if (!r.ok) {
+      console.error("rare-ticket failed", r.status);
+      setRare("うまく つながりませんでした。",
+              "すこし あるいてから もう一度 よみこんでね。",
+              "それでも ダメなときは、コミセンの 受付で 聞いてね。");
+      return;
+    }
+
+    const data = await r.json();
+    const found = RARE_FOUND[area] ?? "レアスポットに ついたね！";
+    if (data.granted) {
+      setRare(found,
+              "ちゅうせんけんを 1まい ゲット！",
+              "12月(がつ)25日(にち)に 抽選(ちゅうせん)します。当(あ)たった人(ひと)には こちらから ご連絡(れんらく)します。ほかの 地区(ちく)も まわると、券(けん)が ふえて 当(あ)たりやすく なるよ！");
+    } else {
+      setRare(found,
+              "この 地区(ちく)の ちゅうせんけんは もう もっているよ",
+              "ほかの 地区(ちく)の レアスポットへ 行(い)くと、券(けん)が ふえて 当(あ)たりやすく なるよ！");
+    }
+  }
+
   // ── 受付（従来どおり：登録して第1のなぞを受け取る）──
   async function joinArea(area) {
     if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; } // 友だち追加もここで促す
@@ -197,6 +269,10 @@
     if (spot) { showHint(spot, liffOk); return; }   // ← ヒントQR
 
     if (!liffOk) { done("エラーが起きました。もう一度ためしてね。"); return; }
+
+    const rare = readParam("rare");                 // ← 抽選QR（レアスポット現地）
+    if (rare) { await claimRareTicket(rare); return; }
+
     const area = readParam("area");                 // ← 受付QR（従来）
     if (!AREA_NAME[area]) { done("地区が指定されていません。台紙のQRから開いてね。"); return; }
     await joinArea(area);
