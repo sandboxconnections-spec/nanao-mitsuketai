@@ -1,0 +1,18 @@
+# ⚠️ このリポジトリは PUBLIC（GitHub Pages 公開）。秘密は絶対に置かない。
+# 置いてしまった場合は「消してコミット」では消えない（履歴に残る）。キーを再発行すること。
+
+# 環境変数・鍵（誤コミット防止の最後の砦）
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*credential*
+*service-account*.json
+
+# 作業用・OS生成物
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
